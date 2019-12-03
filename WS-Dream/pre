@@ -1,0 +1,96 @@
+import pandas as pd
+import numpy as np
+
+rtm=pd.read_csv(r'C:\Users\dell\Desktop\data_deep\ws\dataset2\rtdata.csv',header=None)
+
+tpm=pd.read_csv(r'C:\Users\dell\Desktop\data_deep\ws\dataset2\tpdata.csv',header=None)
+
+rtm1 = np.array(rtm.values[0:30287612,:],dtype=float)#只选有数的部分
+rtm1 = pd.DataFrame(rtm1,columns=["uid","sid","tid","rt"])
+
+#设置列名
+#rtm.coulmns = ["uid","sid","tid","rt"]
+#tpm.coulmns = ["uid","sid","tid","tp"]
+
+############生成一个空的dataframe 4500行 * 9088(64*142)列
+rtma = np.zeros((4500,9088))
+#rtma = np.zeros((3,4))
+df1 = pd.DataFrame(rtma)
+
+#设置行和列
+list = [0]
+for i in range(4501):
+    for j in range(9089):
+        df1.append(list)
+
+##现在rtm1中生成一列新的表示列的数据
+rtm1.loc[:,"cc"] = rtm1.uid*64+rtm1.tid
+
+##一行一行读取所有数据，对于sid从0到4499，对uid和tid的标志0,0-0,1-0,2.。。。142,64
+#for i in range(30287611):
+#    m = int(rtm1.iloc[i,1])
+#    n = int(rtm1.iloc[i,0]*64+rtm1.iloc[i,2])
+#    df1.iloc[m,n] = rtm1.iloc[i,3]
+
+for i in range(30287611):
+    m = int(rtm1.iloc[i,1])
+    n = int(rtm1.loc[i,"cc"])
+    df1.iloc[m,n] = rtm1.iloc[i,3]
+    
+df1.to_csv(r'C:\Users\dell\Desktop\data_deep\ws\dataset2\rtm_2.csv')
+df1.to_pickle(r'C:\Users\dell\Desktop\data_deep\ws\dataset2\rtm_2.pickle') #save results as csv - this file is ready for SVM in R ###CHANGE HERE#####
+      
+    #19:08--
+ 
+##数据转换
+#rtm=pd.read_csv(r'C:\Users\dell\Desktop\data_deep\ws\dataset2\rtdata.csv',header=None)
+#
+#rtm1 = np.array(rtm.values[0:30287612,:],dtype=float)#只选有数的部分
+#rtm1 = pd.DataFrame(rtm1,columns=["uid","sid","tid","rt"])
+#
+#rtma = np.zeros((4500,9088))
+#df1 = pd.DataFrame(rtma)  
+#  
+#rtm.loc[:,"cc"] = rtm1.uid*64+rtm1.tid
+#for i in range(30287612):
+#    m = int(rtm1.iloc[i,1])
+#    n = int(rtm1.loc[i,"cc"])
+#    df1.iloc[m,n] = rtm1.iloc[i,3]
+    
+####
+##以用户为行转置反应时间数据
+rtmm= pd.read_csv('C:\Users\dell\Desktop\data_deep\ws\dataset2\rtdata.csv',header=None)
+rtm1 = np.array(rtmm.values[0:30287611,:],dtype=float)#只选有数的部分
+rtm1 = pd.DataFrame(rtm1,columns=["uid","sid","tid","rt"])
+rtma = np.zeros((288000,142))
+df1 = pd.DataFrame(rtma)   
+rtm1.loc[:,"cc"] = rtm1.sid*64+rtm1.tid
+for i in range(30287611):
+    m = int(rtm1.iloc[i,0])
+    n = int(rtm1.loc[i,"cc"])
+    df1.iloc[n,m] = rtm1.iloc[i,3]
+arr=np.array(df1)
+arr1=arr.T
+df2=pd.DataFrame(arr1)
+df2.to_csv(r'C:\Users\dell\Desktop\data_deep\ws\dataset2\data2\Uid_rtdata.csv',index=True,sep=',')
+df2.to_pickle(r'C:\Users\dell\Desktop\data_deep\ws\dataset2\data2\Uid_rtdata.pickle') #save results as csv - this file is ready for SVM in R ###CHANGE HERE#####
+ 
+#####################################################
+
+##以用户为行转置吞吐量数据
+rtmm2= pd.read_csv('C:\Users\dell\Desktop\data_deep\ws\dataset2\tpdata.csv',header=None)
+rtm2 = np.array(rtmm2.values[0:30287611,:],dtype=float)#只选有数的部分
+rtm2 = pd.DataFrame(rtm2,columns=["uid","sid","tid","rt"])
+rtma2 = np.zeros((288000,142))
+df3 = pd.DataFrame(rtma2)   
+rtm2.loc[:,"cc"] = rtm2.sid*64+rtm2.tid
+for i in range(30287611):
+    m = int(rtm2.iloc[i,0])
+    n = int(rtm2.loc[i,"cc"])
+    df3.iloc[n,m] = rtm2.iloc[i,3]  
+arr=np.array(df3)
+arr1=arr.T
+df4=pd.DataFrame(arr1)
+df4.to_csv("F:/wsdream_dataset2/dataset2/Uid_tpdata.csv",index=True,sep=',')
+df4.to_csv(r'C:\Users\dell\Desktop\data_deep\ws\dataset2\data2\Uid_tpdata.csv',index=True,sep=',')
+df4.to_pickle(r'C:\Users\dell\Desktop\data_deep\ws\dataset2\data2\Uid_tpdata.pickle') #save results as csv - this file is ready for SVM in R ###CHANGE HERE#####

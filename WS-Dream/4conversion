@@ -53,6 +53,83 @@ extracted_features.head()
 extracted_features.to_csv("F:/wsdream_dataset2/dataset2/feature_data.csv",index=True,sep=',')
 
 
+# -*- coding: utf-8 -*-
+"""
+Created on Fri May 17 16:01:46 2019
+将数据转换成sid，tid，uid对应rtdata的形式，以适应tsfresh
+@author: dell
+"""
+
+import pandas as pd
+import numpy as np
+rtm=pd.read_pickle(r'C:\Users\dell\Desktop\data_deep\ws\dataset2\newdata\New_rtdata.pickle')
+
+##选择前10行进行测试
+rtm = np.array(rtm.values[:10,:],dtype=float)#只选有数的部分
+rtm = pd.DataFrame(rtm)
+
+rtm = rtm.T
+
+for i in range(len(rtm.shape[1])):
+dlist = []
+biglist = []
+big = pd.DataFrame
+df = pd.DataFrame() 
+##有多少行就写多少个
+for i in range(10):
+    for j in range(9088):
+        if j%64==0:
+            dlist = pd.DataFrame(rtm[i][j:j+64])
+            df.values[k:k+1,:] = dlist.values[:,:]
+            k = k+1
+    big = pd.concat([big,df])
+    df = pd.DataFrame
+            
+
+          
+
+list1 =[]
+j=-1
+for i in range(288000):
+    if i%64==0:
+        j+=1    
+    list1.append(j)
+      
+list = []
+for i in range(288000):
+    for j in range(64):
+        list.append(j)         
+df["sid"] =  list1
+df["tid"] = list                   
+            
+            
+
+import pandas as pd
+import numpy as np
+rtm=pd.read_pickle(r'C:\Users\18742\Desktop\data_deep\ws\dataset2\newdata\rt-tpdata-new-4500\rt-tpdata-new-4500gm.pickle')
+rtm = np.array(rtm.values[:,:],dtype=float)#只选有数的部分
+rtm = pd.DataFrame(rtm)
+rtm1 = np.zeros((639000,128))
+df2 = pd.DataFrame(rtm1)    
+#tpm1.loc[:,"cc"] = tpm1.uid*64+tpm1.tid
+k=-1
+for j in range(4501):
+    for i in range(18176):
+        m = int(rtm.iloc[0,i])
+        if m%128==0:
+            k=k+1
+            df2.values[k:k+1,:] = rtm.values[j+1:j+2,m:m+128]
+
+df2.to_pickle(r'C:\Users\18742\Desktop\data_deep\ws\dataset2\newdata\cnn_data\rt-tpdata_cnn.pickle')
+df2.to_csv(r'C:\Users\18742\Desktop\data_deep\ws\dataset2\newdata\cnn_data\rt-tpdata_cnn.csv',index=True,sep=',')       
+            
+
+
+
+
+
+
+
 
 
 

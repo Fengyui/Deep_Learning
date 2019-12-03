@@ -1,0 +1,64 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri May 17 20:58:10 2019
+通过使用数据转换成288000*142的形式，便于做cnn，以便形成图的形式
+需要先做kmeans得到y值，之后再进行tsfresh的过滤操作，再进行相应的预测
+@author: dell
+"""
+import pandas as pd
+import numpy as np
+rtm= pd.read_csv('F:/wsdream_dataset2/dataset2/New_rtdata_1.csv',header=None)
+rtm1 = np.array(rtm.values[:,:],dtype=float)#只选有数的部分
+rtm1 = pd.DataFrame(rtm1)
+rtma = np.zeros((288000,142))
+df2 = pd.DataFrame(rtma)    
+k=0
+n=0
+j=0
+for j in range(4501):
+    for i in range(0,9088):
+        m = int(rtm1.iloc[0,i])
+        if m%64==0:
+            df2.values[j*64:j*64+64,n:n+1] = rtm1.values[j+1:j+2,m:m+64].T
+            n=n+1
+    n=0
+df2.to_csv("F:/wsdream_dataset2/dataset2/Fff_rtdata.csv",index=True,sep=',')
+
+rtm= pd.read_csv('F:/wsdream_dataset2/dataset2/Fff_rtdata.csv',header=None)
+rtm1 = np.array(rtm.values[1:288001,:],dtype=float)#只选有数的部分
+rtm = pd.DataFrame(rtm1)
+
+
+###添加uid和sid
+list1 =[]
+j=-1
+for i in range(288000):
+    if i%64==0:
+        j+=1    
+    list1.append(j)
+j=-1      
+list = []
+for i in range(4500):
+    for j in range(64):
+        list.append(j)
+rtm["sid"] = list1
+rtm["tid"] = list
+
+###特征抽取
+from tsfresh import extract_features
+extracted_features = extract_features(rtm,column_id="sid",column_sort="tid")
+
+extracted_features.head()
+
+extracted_features.to_csv("F:/wsdream_dataset2/dataset2/feature_data.csv",index=True,sep=',')
+
+
+
+
+
+
+
+
+
+
+

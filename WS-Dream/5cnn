@@ -1,0 +1,328 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jun 27 22:41:47 2019
+
+@author: 18742
+"""
+
+from __future__ import print_function
+import keras
+from keras.models import Sequential
+from keras.layers import Dense, Dropout, Flatten
+from keras.layers import Conv2D, MaxPooling2D
+from keras import backend as K
+import numpy as np
+import pandas as pd
+from keras.utils import to_categorical
+from keras.layers import Input, Dense, Activation, Dropout, ZeroPadding2D, \
+    advanced_activations as AC, Reshape, Flatten, Embedding, \
+    Conv2D, Conv1D, GlobalMaxPooling2D, GlobalMaxPooling1D, \
+    MaxPooling2D, MaxPooling1D, AveragePooling2D, GlobalAveragePooling1D,\
+    LocallyConnected1D, AveragePooling1D, UpSampling2D,\
+    BatchNormalization, Lambda, Layer, Conv2DTranspose, \
+    LSTM, GRU, TimeDistributed, SimpleRNN, ConvLSTM2D, \
+    merge, Permute, RepeatVector, Cropping1D, Cropping2D, Add, \
+    SeparableConv2D, LocallyConnected2D, Multiply, Concatenate, \
+    SeparableConv1D, CuDNNLSTM, CuDNNGRU, GlobalAveragePooling2D,Convolution1D
+from keras.models import Model
+# LabelEncoder 用来编码输出标签
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import StandardScaler
+from sklearn import preprocessing
+from keras.callbacks import TensorBoard,ModelCheckpoint,\
+        LearningRateScheduler,ReduceLROnPlateau,EarlyStopping
+# StratifiedShuffleSplit可以用来把数据集洗牌，并拆分成训练集和验证集
+from sklearn.model_selection import StratifiedShuffleSplit
+from keras.optimizers import SGD
+from keras.utils import np_utils
+import matplotlib.pyplot as plt
+import time
+rt= pd.read_pickle(r'C:\Users\18742\Desktop\data_deep\ws\dataset2\newdata\rt-tpdata-new-4500\rt-tpdata-new-4500gm.pickle')
+la= pd.read_pickle(r'C:\Users\18742\Desktop\data_deep\ws\dataset2\newdata\sid_label\sid_label4.pickle')
+#rt= pd.read_csv(r'C:\Users\18742\Desktop\data_deep\ws\dataset2\newdata\rt-tpdata-new-4500\F_rtdata.csv',header=None)
+
+rtm1 = np.array(rt.values[:,:-1],dtype=float)#只选有数的部分
+label_reverse=np.array(la.values[0:4500,1:2],dtype=int)
+min_max_scaler = preprocessing.MinMaxScaler()  
+rtm1= min_max_scaler.fit_transform(rtm1)
+
+##每张图片代表一个服务，里面有142个用户，对应的128个值，这里把图片进行格式化
+img_rows, img_cols=142,128
+if K.image_data_format() == 'channels_first':
+    x = rtm1.reshape(4500, 1, img_rows, img_cols)
+    #x_test = x_test.reshape(x_test.shape[0], 1, img_rows, img_cols)
+    input_shape = (1, img_rows, img_cols)
+else:
+    x = rtm1.reshape(4500, img_rows, img_cols, 1)
+    #x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
+    input_shape = (img_rows, img_cols, 1)
+
+sss = StratifiedShuffleSplit(test_size=0.2, random_state=23)
+for train_index, valid_index in sss.split(x, label_reverse):
+    X_train, X_test = x[train_index], x[valid_index]
+    Y_train, Y_test = label_reverse[train_index], label_reverse[valid_index]
+
+#if K.image_data_format() == 'channels_first':
+#    X_train = X_train.reshape(3600, 1, img_rows, img_cols)
+#    X_test = X_test.reshape(900, 1, img_rows, img_cols)
+#    input_shape = (1, img_rows, img_cols)
+#else:
+#    X_train = X_train.reshape(3600, img_rows, img_cols, 1)
+#    X_test = X_test.reshape(900, img_rows, img_cols, 1)
+#    input_shape = (img_rows, img_cols, 1)
+
+#Y_train=np.array(Y_train[:,:],dtype=int)
+
+sss = StratifiedShuffleSplit(test_size=0.1, random_state=23)
+for train_index, valid_index in sss.split(X_train, Y_train):
+    X_train, X_valid = X_train[train_index], X_train[valid_index]
+    Y_train, Y_valid = Y_train[train_index], Y_train[valid_index]
+###这步报错没关系
+    
+#分成四类，并进行独热编码    
+nb_class = 4
+Y_train = np_utils.to_categorical(Y_train, nb_class)
+Y_valid = np_utils.to_categorical(Y_valid, nb_class)
+Y_test = np_utils.to_categorical(Y_test, nb_class)
+
+lr_factors = [0.2, 0.4, 0.6, 0.9]#
+lr_init = 0.001#learning rate
+epochs=40#迭代次数
+batch_size=128#每次输入的数量
+def lr_schedule(epoch):  
+#        lr_init = 0.001 #0.001 0.0002
+#        epoch += xxx
+    if epoch < int(epochs*lr_factors[0]):
+        lr = lr_init
+        return lr
+    if epoch < int(epochs*lr_factors[1]):
+        lr = lr_init*0.1
+        return lr
+    if epoch < int(epochs*lr_factors[2]):
+        lr = lr_init*0.01
+        return lr
+    if epoch < int(epochs*lr_factors[3]):
+        lr = lr_init*0.001
+        return lr
+    lr = lr_init*0.0001
+    return lr 
+
+def lr_log(epoch):
+    lr = model.optimizer.get_config()["lr"]
+    print('Learning rate: %0.8f'%lr)
+    return lr  
+
+callbacks_dl = []
+lr_scheduler = LearningRateScheduler(lr_schedule)
+callbacks_dl.append(lr_scheduler)#这些都是添加学习率的，筛选最佳学习率
+#        early_stopping_patience = 12 #100/2/4
+#        callbacks_dl.append(
+#            ReduceLROnPlateau(monitor=metric_lr_es,factor=0.5, #0.5/0.55 val_loss val_acc
+#                              patience=early_stopping_patience / 2,
+#                              cooldown=early_stopping_patience / 4, verbose=1))
+#        callbacks_dl.append(
+#            EarlyStopping(monitor=metric_lr_es,minlr=1e-6,
+#                          patience=early_stopping_patience, verbose=1))
+
+lr_logger = LearningRateScheduler(lr_log)
+callbacks_dl += [lr_logger]
+
+x_in = Input(shape=X_train.shape[1:])
+patience = 4
+bn = True
+n_filter_top = 32 #30 #90 
+n_filter = n_filter_top
+drop_rate = 0.3
+dense_drop_rate = 0.3 
+x = x_in
+for i in range(4): #3 4
+    for j in range(3): #2 4 3
+        x = Conv2D(n_filter,(3, 3),padding='same')(x)
+        if bn:            
+            x = BatchNormalization(momentum=0.8)(x)
+        x = Activation('relu')(x)
+    x = AveragePooling2D((2, 2))(x)
+    x = Dropout(drop_rate)(x)
+    n_filter = int(n_filter*2) #2 1 1.5
+if bn:
+    x = BatchNormalization(momentum=0.8)(x)
+x = Activation('relu')(x)
+x = GlobalAveragePooling2D()(x)
+x = Dropout(dense_drop_rate)(x)
+
+#全连接层
+prediction = Dense(4,activation="softmax")(x)
+model = Model(x_in, prediction)
+model.summary()
+#model.compile(loss="mse",optimizer='rmsprop',metrics=['mae'])
+model.compile(loss="categorical_crossentropy",optimizer='adam',metrics=['acc'])
+
+tic = time.time()
+history=model.fit(X_train, Y_train, nb_epoch=epochs,batch_size=128, callbacks=callbacks_dl,validation_data=(X_valid, Y_valid))
+
+score = model.evaluate(X_test,Y_test,verbose=0)
+toc = time.time()
+print('Test loss:', score[0])
+print('Test accuracy:', score[1])
+print(toc - tic)
+#pred=model.predict(X_test)       
+
+                                                              
+                                                                        
+                                                                        
+#手写数字数据                                                                     
+from keras.datasets import mnist                                                                  
+(x_train, y_train), (x_test, y_test) = mnist.load_data()                                                                        
+                                                                        
+img_rows, img_cols = 28, 28                                                                        
+if K.image_data_format() == 'channels_first':
+    # -x_train.shape[0]=6000
+    x_train = x_train.reshape(x_train.shape[0], 1, img_rows, img_cols)
+    # -x_train.shape:(60000, 1, 28, 28)
+    x_test = x_test.reshape(x_test.shape[0], 1, img_rows, img_cols)
+    # x_test.shape:(10000, 1, 28, 28)
+    # 单通道灰度图像,channel=1
+    input_shape = (1, img_rows, img_cols)
+else:
+    x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
+    x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
+    input_shape = (img_rows, img_cols, 1)
+                                                                      
+
+
+img_rows, img_cols=142,128
+xx=rtm1.reshape(4500, img_rows, img_cols)
+
+
+if K.image_data_format() == 'channels_first':
+    x = xx.reshape(4500, 1, img_rows, img_cols)
+    #x_test = x_test.reshape(x_test.shape[0], 1, img_rows, img_cols)
+    input_shape = (1, img_rows, img_cols)
+else:
+    x = xx.reshape(4500, img_rows, img_cols, 1)
+    #x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
+    input_shape = (img_rows, img_cols, 1)
+
+sss = StratifiedShuffleSplit(test_size=0.2, random_state=23)
+for train_index, valid_index in sss.split(x, label_reverse):
+    X_train, X_test = x[train_index], x[valid_index]
+    Y_train, Y_test = label_reverse[train_index], label_reverse[valid_index]
+
+sss = StratifiedShuffleSplit(test_size=0.1, random_state=23)
+for train_index, valid_index in sss.split(X_train, Y_train):
+    X_train, X_valid = X_train[train_index], X_train[valid_index]
+    Y_train, Y_valid = Y_train[train_index], Y_train[valid_index]                                                                   
+ 
+
+nb_class = 4
+Y_train = np_utils.to_categorical(Y_train, nb_class)
+Y_valid = np_utils.to_categorical(Y_valid, nb_class)
+Y_test = np_utils.to_categorical(Y_test, nb_class)
+
+                                                                       
+from keras.models import Input,Model
+x_in = Input(shape=X_train.shape[1:])
+patience = 4
+bn = True
+n_filter_top = 32 #30 #90 
+n_filter = n_filter_top
+drop_rate = 0.3
+dense_drop_rate = 0.3 
+x = x_in
+for i in range(4): #3 4
+    for j in range(3): #2 4 3
+        x = Conv2D(n_filter,(3, 3),padding='same')(x)
+        if bn:            
+            x = BatchNormalization(momentum=0.8)(x)
+        x = Activation('relu')(x)
+    x = AveragePooling2D((2, 2))(x)
+    x = Dropout(drop_rate)(x)
+    n_filter = int(n_filter*2) #2 1 1.5
+if bn:
+    x = BatchNormalization(momentum=0.8)(x)
+x = Activation('relu')(x)
+x = GlobalAveragePooling2D()(x)
+x = Dropout(dense_drop_rate)(x)
+
+prediction = Dense(4,activation="softmax")(x)
+model = Model(x_in, prediction)
+model.summary()
+lr_init = 0.001
+lr_factors = [0.4, 0.6, 0.8, 0.9]
+def lr_schedule(epoch):
+#        lr_init = 0.001 #0.001 0.0002
+#        epoch += xxx
+    if epoch < int(epochs*lr_factors[0]):
+        lr = lr_init
+        return lr
+    if epoch < int(epochs*lr_factors[1]):
+        lr = lr_init*0.1
+        return lr
+    if epoch < int(epochs*lr_factors[2]):
+        lr = lr_init*0.01
+        return lr
+    if epoch < int(epochs*lr_factors[3]):
+        lr = lr_init*0.001
+        return lr
+    lr = lr_init*0.0001
+    return lr
+in_cv=False
+class CustomModelCheckpoint(keras.callbacks.Callback):
+    def on_train_begin(self, logs={}):
+        if in_cv:
+            self.ts_type = "cv"+str(in_cv)
+        else:
+            self.ts_type = "blind"
+        self.rocp = []
+        self.f1 = []
+        self.val_acc = []
+        self.rfa = []
+        self.df_hist = pd.DataFrame(
+                columns=["epoch","loss","acc","val_loss","val_acc",
+                         "rocp","f1","rfa"])
+        self.idx = 0
+        self.best_epoch = 1
+callbacks_dl = []
+custom_checkpoint = CustomModelCheckpoint()
+callbacks_dl.append(custom_checkpoint)
+use_clr=True
+if use_clr:
+    lr_scheduler = LearningRateScheduler(lr_schedule)
+    callbacks_dl.append(lr_scheduler)
+#         early_stopping_patience = 4 #100/2/4
+#        callbacks_dl.append(
+#            ReduceLROnPlateau(monitor=metric_lr_es,factor=0.5, #0.5/0.55 val_loss val_acc
+#                              patience=early_stopping_patience / 2,
+#                              cooldown=early_stopping_patience / 4, verbose=1))
+#        callbacks_dl.append(
+#            EarlyStopping(monitor=metric_lr_es,minlr=1e-6,
+#                          patience=early_stopping_patience, verbose=1))
+
+
+#model.compile(loss="mse",optimizer='rmsprop',metrics=['mae'])
+model.compile(loss="categorical_crossentropy",optimizer='adam',metrics=['acc'])
+epochs = 10
+#history=model.fit(X_train, Y_train, nb_epoch=nb_epoch, validation_data=(X_valid, Y_valid))
+tic = time.time()
+history=model.fit(X_train, Y_train, epochs=epochs,callbacks=callbacks_dl,validation_data=(X_valid, Y_valid))
+
+score = model.evaluate(X_test,Y_test,verbose=0)
+toc = time.time()
+print('Test loss:', score[0])
+print('Test accuracy:', score[1])
+print(toc - tic)
+pred=model.predict(X_test)             
+
+watch_cls=1
+label_out_pred_sk = np.argmax(pred,axis=1)
+label_out_pred_m = label_out_pred_sk
+label_out_pred=np.asarray(label_out_pred_m==watch_cls,dtype=np.int32)
+label_out_pred_prob = pred[:,watch_cls]    
+import sklearn                                             
+from sklearn.metrics import balanced_accuracy_score                                                                        
+balanced_accuracy_score(y_test, label_out_pred_sk)                                                                        
+
+y_true = [0, 1, 0, 0, 0, 0]
+y_pred = [0, 1, 0, 1, 1, 0]
+balanced_accuracy_score(y_true, y_pred)
+y_test=Y_test

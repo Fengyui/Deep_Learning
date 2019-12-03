@@ -1,0 +1,655 @@
+"""
+Created on Mon Nov 19 14:04:08 2018
+包含所有机器学习方法
+把70%以上的算法单独拎出来写成函数，直接进行调用后进行软投票
+确定预测结果
+@author: dell
+"""
+
+import time
+import pandas as pd
+import numpy as np
+import xgboost as xgb
+from xgboost.sklearn import XGBClassifier
+from sklearn import cross_validation, metrics   #Additional     scklearn functions  #Perforing grid search
+from sklearn import preprocessing
+import matplotlib.pylab as plt
+from sklearn import linear_model
+from sklearn.linear_model import LogisticRegression,RidgeClassifier,\
+        Perceptron,PassiveAggressiveClassifier,RandomizedLogisticRegression
+np.random.seed(10)
+from sklearn.svm import SVC, LinearSVC, NuSVC, OneClassSVM
+#from sklearn.datasets import make_classification
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.pipeline import make_pipeline
+from sklearn.model_selection import cross_val_score, StratifiedKFold,\
+         KFold,train_test_split, StratifiedShuffleSplit, GridSearchCV, RandomizedSearchCV
+from sklearn.ensemble import GradientBoostingClassifier, RandomTreesEmbedding,\
+        RandomForestClassifier, VotingClassifier, IsolationForest,\
+        AdaBoostClassifier, BaggingClassifier, ExtraTreesClassifier
+from matplotlib.pylab import rcParams
+from sklearn.metrics import classification_report,confusion_matrix,\
+        precision_score, f1_score, accuracy_score, recall_score,\
+        roc_auc_score,roc_curve, auc, consensus_score, brier_score_loss, log_loss
+from sklearn.feature_selection import VarianceThreshold
+from sklearn import linear_model
+from sklearn.linear_model import LogisticRegression,RidgeClassifier,\
+        Perceptron,PassiveAggressiveClassifier,RandomizedLogisticRegression
+from sklearn.metrics import classification_report,confusion_matrix,\
+        precision_score, f1_score, accuracy_score, recall_score,\
+        roc_auc_score,roc_curve, auc, consensus_score, brier_score_loss, log_loss
+from sklearn.model_selection import train_test_split
+import xgboost as xgb
+from xgboost.sklearn import XGBClassifier
+import numpy as np
+import pandas as pd 
+from sklearn import preprocessing
+from sklearn.feature_selection import VarianceThreshold
+from sklearn import linear_model
+from sklearn.linear_model import LogisticRegression,RidgeClassifier,\
+        Perceptron,PassiveAggressiveClassifier,RandomizedLogisticRegression
+from sklearn.metrics import classification_report,confusion_matrix,\
+        precision_score, f1_score, accuracy_score, recall_score,\
+        roc_auc_score,roc_curve, auc, consensus_score, brier_score_loss, log_loss
+from sklearn.model_selection import train_test_split
+from sklearn.feature_selection import VarianceThreshold
+from sklearn.preprocessing import MinMaxScaler
+#from sklearn.model_selection import train_test_split
+from sklearn.linear_model import SGDClassifier
+import matplotlib.pyplot as plt
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.metrics import auc
+from sklearn.metrics import roc_curve 
+from imblearn.over_sampling import RandomOverSampler,ADASYN,SMOTE, \
+     BorderlineSMOTE, SVMSMOTE, SMOTENC
+
+
+time_start=time.time()
+
+###解决二分类问题
+def xgboost_1(label,train_x,train_y,test_x,test_y):
+    #train_x, test_x, train_y, test_y = train_test_split(Data_new, label, test_size = 1/5 ,random_state=0)        
+    dtrain_cv = xgb.DMatrix(train_x,label=train_y)
+    dval = xgb.DMatrix(test_x,label=test_y)
+    #        dtest = xgb.DMatrix(x_out_org,label=y_out_org,feature_names=cols_new)
+    watchlist  = [(dval,'eval'), (dtrain_cv,'train')]
+    #        watchlist  = [(dtest,'eval'), (dtrain_cv,'train')]
+    eval_metric = "error" #error/100 auc/10 logloss/full
+    #param_xgb = {'max_depth':2, 'eta':0.1, 'learning_rate':0.1, #2 5
+    #             'silent':1, 'verbose':0, 'seed':2100,
+    #             'objective':'binary:logistic',
+    #             'booster':'gbtree',
+    #             'alpha': 0.01, 'lambda': 0.1, #0.0001 0.001
+    #             'gamma':0.0, 'min_child_weight':1,
+    #             'subsample':0.8, 'colsample_bytree':0.8,
+    #             'scale_pos_weight':1,
+    #             'nthread':4, 'eval_metric':eval_metric}
+    param_xgb = {'max_depth':2, 'eta':0.1, 'learning_rate':0.1, #2 5
+                 'silent':1, 'verbose':0, 'seed':2100,
+                 'objective':'binary:logistic',
+                 'booster':'gblinear',
+                 'alpha': 0.01, 'lambda': 0.1, #0.0001 0.001
+                 'subsample':0.8, 'colsample_bytree':0.8,
+                 'scale_pos_weight':1,
+                 'nthread':4, 'eval_metric':eval_metric}
+    
+    #        early_stopping_rounds = 100 #10 50 100 full
+    #num_round_xgb = 300 #mb:425 all:1000##适用于1D
+    num_round_xgb = 75  ##适用于sg
+    bst = xgb.train(param_xgb, dtrain_cv, num_round_xgb,
+                    evals=watchlist,
+                    #                        early_stopping_rounds=early_stopping_rounds,
+                    verbose_eval=25)
+    
+    label_out_pred_prob_x = bst.predict(dval)
+    label_out_pred_x = np.array([label_out_pred_prob_x[i]>0.5 for i in range(len(label_out_pred_prob_x))],dtype=bool)
+    predictions = label_out_pred_x   
+
+    print("======xgboost==========")
+    accuracy = accuracy_score(test_y,predictions)
+    print('Accuracy: %.2f%%' % (accuracy*100.0))
+    print(classification_report(test_y, predictions))
+    print(confusion_matrix(test_y, predictions))
+    print("ACCURACY:", accuracy_score(test_y, predictions))
+    print("PRECISION", precision_score(test_y, predictions))
+    print("RECALL:", recall_score(test_y, predictions))
+    print("F1:", f1_score(test_y, predictions))
+    print("ROC_AUC(Pr.):", roc_auc_score(test_y, predictions))
+    return bst,label_out_pred_prob_x
+    
+
+#进行多分类的XGboost
+def xgbboost(label,train_x,train_y,test_x,test_y):
+    xg_train = xgb.DMatrix(train_x, label=train_y)
+    xg_test = xgb.DMatrix(test_x, label=test_y)
+    # setup parameters for xgboost
+    param = {}
+    # use softmax multi-class classification
+    param['objective'] = 'multi:softmax'
+    # scale weight of positive examples
+    param['eta'] = 0.1
+    param['max_depth'] = 6
+    param['silent'] = 1
+    param['nthread'] = 4
+    param['num_class'] = 6
+ 
+    watchlist = [ (xg_train,'train'), (xg_test, 'test') ]
+    num_round = 5
+#    bst = xgb.train(param, xg_train, num_round, watchlist );
+#    # get prediction
+#    pred = bst.predict( xg_test );
+#    
+#    print('predicting, classification error=%f' % (sum( int(pred[i]) != test_y[i] for i in range(len(test_y))) / float(len(test_y)) ))
+#    
+#   # do the same thing again, but output probabilities
+    param['objective'] = 'multi:softprob'
+    bst = xgb.train(param, xg_train, num_round, watchlist );
+    # Note: this convention has been changed since xgboost-unity
+    # get prediction, this is in 1D array, need reshape to (ndata, nclass)
+    prediction = bst.predict(xg_test).reshape(test_y.shape[0], 6 )
+    predictions = np.argmax(prediction, axis=1)  # return the index of the biggest pro
+   # print ('predicting, classification error=%f' % (sum( int(ylabel[i]) != test_y[i] for i in range(len(test_y))) / float(len(test_y)) ))
+    
+    print("======xgboost==========")
+    accuracy = accuracy_score(test_y,predictions)
+    print('Accuracy: %.2f%%' % (accuracy*100.0))
+    print(classification_report(test_y, predictions))
+    print(confusion_matrix(test_y, predictions))
+    print("ACCURACY:", accuracy_score(test_y, predictions))    
+    print("PRECISION", precision_score(test_y, predictions,average='micro'))
+    print("RECALL:", recall_score(test_y, predictions,average='micro'))
+    print("F1:", f1_score(test_y, predictions,average='micro'))
+    return bst
+    
+    
+def sgdclass(label,train_x,train_y,test_x,test_y):
+    #Data_new = MinMaxScaler().fit_transform(Data_new)#对数据进行标准化处理
+    #train_x, test_x, train_y, test_y = train_test_split(Data_new, label, test_size = 1/5,random_state=0)
+    sgd = SGDClassifier(alpha=0.001, max_iter=100,penalty="l1",loss="hinge").fit(train_x,train_y)
+    
+#    clf = SGDClassifier()
+#    clf.fit(train_x,train_y)
+#    y_pre = clf.predict(test_x)
+#    clf.score(test_x,test_y)
+
+    y_pre = sgd.predict(test_x)
+    print("======sgd==========")
+
+    accuracy = accuracy_score(test_y,y_pre)
+    print('Accuracy: %.2f%%' % (accuracy*100.0))
+    print(classification_report(test_y, y_pre))
+    print(confusion_matrix(test_y, y_pre))
+    print("ACCURACY:", accuracy_score(test_y, y_pre),average='micro')    
+    print("PRECISION", precision_score(test_y, y_pre),average='micro')
+    print("RECALL:", recall_score(test_y, y_pre),pos_label='positive',average='micro')
+    print("F1:", f1_score(test_y, y_pre),average='micro')
+    print("ROC_AUC(Pr.):", roc_auc_score(test_y, y_pre))
+    return sgd
+    
+
+###SVM解决类别不平衡问题
+def svm(label,train_x,train_y,test_x,test_y):
+    # Create support vector classifier
+    svc = SVC(kernel='linear', class_weight='balanced', C=1.0, random_state=0)
+    # Train classifier
+    model = svc.fit(train_x, train_y)
+    y_pre = model.predict(test_x)
+    print("======svm==========")
+
+    accuracy = accuracy_score(test_y,y_pre)
+    print('Accuracy: %.2f%%' % (accuracy*100.0))
+    print(classification_report(test_y, y_pre))
+    print(confusion_matrix(test_y, y_pre))
+    print("ACCURACY:", accuracy_score(test_y, y_pre))    
+    print("PRECISION", precision_score(test_y, y_pre))
+    print("RECALL:", recall_score(test_y, y_pre))
+    print("F1:", f1_score(test_y, y_pre))
+    print("ROC_AUC(Pr.):", roc_auc_score(test_y, y_pre))
+    return svm
+    
+    
+    
+    
+
+def random_forest(label,train_x,train_y,test_x,test_y):
+    #train_x, test_x, train_y, test_y = train_test_split(Data_new, label, test_size = 1/5 ,random_state=0)        
+    random_state = 2100
+    
+    ##1  58.07%
+#    rf=ExtraTreesClassifier(oob_score=False,warm_start=False,
+#                                    random_state=random_state,n_jobs=6,
+#                                    max_features='auto',criterion='gini',
+#                                    n_estimators=1500,max_depth=None,
+#                                    min_samples_split=2,min_samples_leaf=1)
+    #2   58.55%
+    rf = RandomForestClassifier(n_estimators=150, criterion='gini',
+                               max_depth=50, min_samples_split=6, oob_score=False,
+                               random_state=random_state)
+    
+    ##3         57.83%
+#    rf=RandomForestClassifier(oob_score=False,warm_start=False,
+#                                   random_state=random_state,n_jobs=6,
+#                                   max_features="auto",criterion='gini',
+#                                   n_estimators=1000,max_depth=None,
+#                                    min_samples_split=2,min_samples_leaf=1)
+    ##4    准确率63.61%
+###gbdt          
+#    rf = GradientBoostingClassifier(n_estimators=500, max_depth=4, max_features="auto",
+#                                  learning_rate=0.4, subsample=1.0,random_state=random_state)
+
+#    ##5    69.64%
+#    rf = NuSVC(nu=0.25,kernel='linear',gamma=0.25,probability=True,random_state=random_state)
+#
+#    ##6   68.92%
+#    rf = SVC(kernel="linear",gamma=0.25,C=1.0,probability=True,random_state=random_state)
+   ##7   55.6%
+    #rf = SGDClassifier(alpha=3.1250e-02, penalty='l1', loss='hinge')
+  
+    rf.fit(train_x,train_y)    
+    y_pre = rf.predict(test_x)
+    print("======rf==========")
+
+    accuracy = accuracy_score(test_y,y_pre)
+    print('Accuracy: %.2f%%' % (accuracy*100.0))
+    print(classification_report(test_y, y_pre))
+    print(confusion_matrix(test_y, y_pre))
+    print("ACCURACY:", accuracy_score(test_y, y_pre))    
+    print("PRECISION", precision_score(test_y, y_pre))
+    print("RECALL:", recall_score(test_y, y_pre))
+    print("F1:", f1_score(test_y, y_pre))
+    print("ROC_AUC(Pr.):", roc_auc_score(test_y, y_pre))
+    return rf
+
+def bag_(label,train_x,train_y,test_x,test_y):
+    #train_x, test_x, train_y, test_y = train_test_split(Data_new, label, test_size = 1/5 ,random_state=0)        
+    random_state = 2100
+
+    #7   feed bg      很慢  70.12%
+    feed = linear_model.LogisticRegression(dual=False,C=100.0,penalty='l2',n_jobs=1,random_state=random_state) 
+#        feed=linear_model.LogisticRegression(dual=False,C=200.0,penalty='l2',n_jobs=1,random_state=random_state)
+    bg = BaggingClassifier(base_estimator=feed, n_estimators=20,
+                         max_samples=1.0, max_features=1.0,
+                         bootstrap=True, bootstrap_features=True,
+                         oob_score=False, warm_start=False,
+                         n_jobs=4, random_state=random_state, verbose=0)
+
+
+    bg.fit(train_x,train_y)    
+    y_pre = bg.predict(test_x)
+    print("======bagging==========")
+
+    accuracy = accuracy_score(test_y,y_pre)
+    print('Accuracy: %.2f%%' % (accuracy*100.0))
+    print(classification_report(test_y, y_pre))
+    print(confusion_matrix(test_y, y_pre))
+    print("ACCURACY:", accuracy_score(test_y, y_pre))    
+    print("PRECISION", precision_score(test_y, y_pre))
+    print("RECALL:", recall_score(test_y, y_pre))
+    print("F1:", f1_score(test_y, y_pre))
+    print("ROC_AUC(Pr.):", roc_auc_score(test_y, y_pre))
+    return bg
+
+def decisonT(label,train_x,train_y,test_x,test_y):
+    dc=DecisionTreeRegressor(criterion='mse', max_depth=None, max_features=None,
+           max_leaf_nodes=None, min_impurity_decrease=0.0,
+           min_impurity_split=None, min_samples_leaf=1,
+           min_samples_split=2, min_weight_fraction_leaf=0.0,
+           presort=False, random_state=None, splitter='best')
+    
+    
+    
+    dc.fit(train_x,train_y)    
+    y_pre = dc.predict(test_x)
+    print("======bagging==========")
+
+    accuracy = accuracy_score(test_y,y_pre)
+    print('Accuracy: %.2f%%' % (accuracy*100.0))
+    print(classification_report(test_y, y_pre))
+    print(confusion_matrix(test_y, y_pre))
+    print("ACCURACY:", accuracy_score(test_y, y_pre))    
+    print("PRECISION", precision_score(test_y, y_pre))
+    print("RECALL:", recall_score(test_y, y_pre))
+    print("F1:", f1_score(test_y, y_pre))
+    print("ROC_AUC(Pr.):", roc_auc_score(test_y, y_pre))
+    return dc
+
+    
+def logic_(label,train_x,train_y,test_x,test_y):
+    #train_x, test_x, train_y, test_y = train_test_split(Data_new, label, test_size = 1/5 ,random_state=0)        
+    random_state = 2100
+#    ##9  logic  71.08%
+    logic = linear_model.LogisticRegression(dual=False,C=4,penalty='l2',n_jobs=1,#tol=1e-5,
+                                          random_state=random_state)
+    
+    ##clf5    70.36%
+#    logic =l inear_model.LogisticRegression(dual=False,C=10,penalty='l2',n_jobs=1,
+#                                          random_state=random_state)
+
+
+    logic.fit(train_x,train_y)    
+    y_pre = logic.predict(test_x)
+    print("======logic==========")
+
+    accuracy = accuracy_score(test_y,y_pre)
+    print('Accuracy: %.2f%%' % (accuracy*100.0))
+    print(classification_report(test_y, y_pre))
+    print(confusion_matrix(test_y, y_pre))
+    print("ACCURACY:", accuracy_score(test_y, y_pre))    
+    print("PRECISION", precision_score(test_y, y_pre))
+    print("RECALL:", recall_score(test_y, y_pre))
+    print("F1:", f1_score(test_y, y_pre))
+    print("ROC_AUC(Pr.):", roc_auc_score(test_y, y_pre))
+    return logic
+    
+def adaboost_(label,train_x,train_y,test_x,test_y,sorts):
+    #train_x, test_x, train_y, test_y = train_test_split(Data_new, label, test_size = 1/5 ,random_state=0)        
+    random_state = 2100
+  
+    ##  ada    70.36%   慢
+    feed = linear_model.LogisticRegression(dual=False,C=10000,penalty='l1',n_jobs=1,random_state=random_state)
+    ada = AdaBoostClassifier(feed,algorithm="SAMME.R", #SAMME.R SAMME
+                                  n_estimators=100,learning_rate=0.1,
+                                  random_state=random_state)
+
+    ada.fit(train_x,train_y)    
+    y_pre = ada.predict(test_x)
+    print("======ada==========")
+    ##计算平均准确率
+    metrics.average_precision_score(test_y=test_y, y_score=y_pre)
+    accuracy = accuracy_score(test_y,y_pre)
+    print('Accuracy: %.2f%%' % (accuracy*100.0))
+    print(classification_report(test_y, y_pre))
+    
+    print(confusion_matrix(test_y, y_pre))
+    print("ACCURACY:", accuracy_score(test_y, y_pre))    
+    print("PRECISION", precision_score(test_y, y_pre,average='micro'))
+    print("RECALL:", recall_score(test_y, y_pre,average='micro'))
+    print("F1:", f1_score(test_y, y_pre,average='micro'))
+    print("ROC_AUC(Pr.):", roc_auc_score(test_y, y_pre))
+    #print("ROC_AUC(Pr.):", roc_auc_score(test_y, y_pre),average='micro')
+    
+    ###分类报告
+    from sklearn.metrics import classification_report
+    target_names = ['class 0', 'class 1', 'class 2', 'class 3', 'class 4']
+    print(classification_report(test_y, y_pre, target_names=target_names))
+   
+    ###绘制roc图
+    for i in range(sorts):
+        plt_roc(test_y,y_pre,i)
+        
+    return ada
+
+##绘制ROC图
+def plt_roc(test_y,y_pre,pos_label):   
+    fpr_oc, tpr_oc, _ = roc_curve(test_y,y_pre,pos_label=pos_label)##表示label=1是标准阳性标签
+    plt.figure(8881,figsize=(10,8))
+    plt.plot([0, 1], [0, 1], 'k--')
+    plt.plot(fpr_oc, tpr_oc, 'r-',label=label)
+
+    Auc = metrics.auc(fpr_oc, tpr_oc)  
+    plt.xlabel('False positive rate')
+    plt.ylabel('True positive rate')
+    plt.title('ROC curve_label=4' )
+    plt.title('ROC_curve' + '(AUC: ' + str(Auc) + ')' +'label=%d'%pos_label)
+    plt.legend(loc='best')
+    plt.show() 
+    
+##类别不平衡解决方法：smote
+def fix_batch(batch_size,hdx_seed,x_train,y_train_flat,
+              train_ros=True,batch_fix=False):
+    if train_ros:
+        x_train_flat = x_train.reshape((x_train.shape[0],-1))
+#        ros=RandomOverSampler(random_state=hdx_seed)
+        ros = SMOTE(ratio='auto', random_state=hdx_seed, k_neighbors=5, m_neighbors=10,
+     out_step=0.5, kind='regular', svm_estimator=None, n_jobs=1)
+        ros=SMOTE(random_state=hdx_seed)
+#            ros=ADASYN(random_state=hdx_seed)
+#            ros=BorderlineSMOTE(random_state=hdx_seed, kind='borderline-1')
+#            ros=BorderlineSMOTE(random_state=hdx_seed, kind='borderline-2')
+#            ros=SVMSMOTE(random_state=hdx_seed)
+#            ros=SMOTENC(categorical_features=[0,1], random_state=hdx_seed) #[0,1,2]
+        x_train_ros,y_train_ros=ros.fit_sample(x_train_flat,y_train_flat)
+        print('Over sampling:',x_train.shape[0],"->",x_train_ros.shape[0])
+        x_train_new=x_train_ros.reshape(
+                (x_train_ros.shape[0],img_rows,img_cols,channels))
+        y_train_new = y_train_ros
+    else:
+        x_train_new = x_train
+        y_train_new = y_train_flat
+
+    if batch_fix:
+        if x_train_new.shape[0]%batch_size!=0:
+            n_add=batch_size-x_train_new.shape[0]%batch_size
+            rnd=np.random.RandomState(hdx_seed)
+            if batch_fix_v2:
+                x_train_lb=x_train
+                y_train_lb=y_train_flat
+            else:
+                x_train_lb=x_train_new
+                y_train_lb=y_train_new
+            if not batch_fix_balance:
+                idxs_add=rnd.choice(x_train_lb.shape[0],n_add,replace=False)
+                x_tr_add=x_train_lb[idxs_add]
+                y_tr_add=y_train_lb[idxs_add]
+                x_train_new = np.concatenate([x_train_new,x_tr_add])
+                y_train_new = np.concatenate([y_train_new,y_tr_add])
+            else:
+                for i in range(2):
+                    lb_add=i
+                    if lb_add==0:
+                        n_add_lbc=n_add//2
+                    else:
+                        n_add_lbc=n_add-n_add_lbc
+                    ids_lbc=np.where(y_train_lb==lb_add)[0]
+                    x_train_lbc=x_train_lb[ids_lbc]
+                    y_train_lbc=y_train_lb[ids_lbc]
+                    idxs_add=rnd.choice(x_train_lbc.shape[0],n_add_lbc,replace=False)
+                    x_tr_add=x_train_lbc[idxs_add]
+                    y_tr_add=y_train_lbc[idxs_add]
+                    x_train_new = np.concatenate([x_train_new,x_tr_add])
+                    y_train_new = np.concatenate([y_train_new,y_tr_add])
+            print('Add train samples:',n_add)
+    return x_train_new, y_train_new
+            
+            
+def all_function(label,train_x,train_y,test_x,test_y,ada,logic,bst):
+    #对训练数据进行交叉验证，使用盲测集进行最终测试
+    #应该对train_x中的数据进行交叉验证，同样所有的数据都应该做一样的处理，否则存在数据作弊
+    ###把所有的算法都跑一遍，就可以对应使用软投票的方法，根据权重来对数据的结果进行预测
+    vc=VotingClassifier(estimators=[
+##                                        ('nusvc', clf1), #*
+                                     ('xgboost', bst), #**
+##                                        ('sgd', sgd), #**
+##                                        ('rf',  rf), #
+                                     ('logic',logic),
+                                        ('ada',  ada), #**
+#                                        ('bg',  bg), #*
+                                     ],
+                          weights=[1.0,2.0,1.0],##设置权重
+##                            weights=[1.0,1.0,1.5],
+                         voting='soft') #soft hard
+    
+    ml = vc
+    ml.fit(train_x, train_y)
+    
+    return ml
+
+
+
+
+
+
+
+
+
+
+if __name__ == "__main__":
+#    file = r"C:\Users\dell\Desktop\daylife\CSVread\data_set\df_nmvf-mb-ns_mean_16900_zero.csv"
+#    data1 = pd.read_csv(file,index_col=None)
+#    data1 = data1[~data1['subclass'].isin([16])]
+#    data2 = np.array(data1.values[:,0:16900],dtype=float)#只选有数的部分
+#    label = np.array(data1.label.values)
+#    column = list(data1.columns)
+#    data2 = pd.DataFrame(data2,columns=column[:16900])
+   # file = r'C:\Users\dell\Desktop\data_deep\ws\dataset2\newdata\rtm_predyclass2.pickle'
+    
+   
+#    file = r'C:\Users\dell\Desktop\data_deep\ws\dataset2\newdata\rtm_predy.pickle'
+##    column=list(data1.columns)
+#    data1 = pd.read_pickle(file)
+#    label = np.array(data1.values[:,-1])#只选有数的部分
+#    rtm = np.array(data1.values[:,:-1],dtype=float)#只选有数的部分    
+
+    
+    file = r'C:\Users\dell\Desktop\data_deep\ws\dataset2\newdata\rt-tpdata-new-4500\rt-tpdata-new-4500gm.pickle'
+#    #file = r'C:/Users/18742/Desktop/data_deep/ws/dataset2/newdata/rtm_predy.pickle'
+#    data1 = pd.read_csv(file)
+#    data1.to_pickle(r'C:\Users\dell\Desktop\data_deep\ws\dataset2\newdata\rt-tpdata-new-4500\rt-tpdata-new-4500gm.pickle')
+    file2 = r"C:\Users\dell\Desktop\data_deep\ws\dataset2\newdata\sid_label\sid_label5.pickle"
+    
+    data1 = pd.read_pickle(file)
+    labelsid = pd.read_pickle(file2)
+    
+#    column=list(data1.columns)
+#    label = np.array(data1.values[:,-1])#只选有数的部分
+#    rtm = np.array(data1.values[:,:-1],dtype=float)
+    
+    label = np.array(labelsid.values[:,-1])#只选有数的部分
+    rt_tp = np.array(data1.values[:,:-1],dtype=float)#只选有数的部分
+    
+    
+    ###进行onehot编码
+#    label = OneHotEncoder(sparse=False).fit_transform(label.reshape((-1,1)))
+#    data1 = pd.DataFrame(data1,columns=column[1:])
+#    label = np.array(data1.label.values)
+#np.sum(label==1)      
+#    data2 = np.array(data1.values[:,0:16900],dtype=float)#只选有数的部分
+#    column=column[1:]
+#    data2 = pd.DataFrame(data2,columns=column[:16900])
+    
+#对最终的数据进行训练集和测试集的拆分，目的是希望能够相当于在得到一批新的数据的时候，能够完全通过
+#之前的数据预测出最好的结果来
+#    data_train=data1[~data1['batch'].isin(["T08","T09"])]
+#    data_test=data1[data1['batch'].isin(["T08","T09"])] 
+      
+#原本的数据是直接对数据集进行拆分，使用train_test_split
+#但实际上为了防止数据作弊，并且在sta_fea_1中，已经将训练集和测试集进行划分，并对训练集数据进行交叉验证
+#    train_x = np.array(data_train.iloc[:,:16900].values,dtype=float)
+#    train_y = np.array(data_train.label.values,dtype=int)
+#    test_x = np.array(data_test.iloc[:,:16900].values,dtype=float)
+#    test_y = np.array(data_test.label.values,dtype=int)
+#    
+#    batch_org=np.array(data_train.batch.values,dtype=str)#只读取batch列
+#    cols_org=np.array(data_train.columns[:16900],dtype=str)#
+
+
+#单独可以跑的
+#    from sklearn.model_selection import StratifiedShuffleSplit  
+#    sss = StratifiedShuffleSplit(test_size=0.2, random_state=23)
+#    for train_index, test_index in sss.split(rtm, label):
+#        X_train, X_test = rtm[train_index], rtm[test_index]
+#        Y_train, Y_test = label[train_index], label[test_index]
+    sss = StratifiedShuffleSplit(test_size=0.2, random_state=23)
+    for train_index, test_index in sss.split(rt_tp, label):
+        X_train, X_test = rt_tp[train_index], rt_tp[test_index]
+        Y_train, Y_test = label[train_index], label[test_index]       
+        
+    hdx_seed=2100
+    batch_size_cv = 64##看看是多少折的运算
+    batch_fix = False
+    train_ros = False
+    batch_fix_v2 = False
+    batch_fix_balance = True
+    img_rows, img_cols = 4500, 128
+    channels = 1
+    X_train,Y_train=fix_batch(
+            batch_size_cv,hdx_seed,X_train,Y_train,
+            train_ros,batch_fix)
+    
+    train_x=X_train  
+    test_x=X_test
+    train_y=Y_train
+    test_y=Y_test
+##对挑出来的数据进行重新聚类并进行机器学
+    #data_o3 = data1[data1['label']!=2]  取数据label不是2的类别的
+    #data_o3 = data1[data1['label']==2]  取数据label是2的类别的
+    
+#    data_o3 = np.array(data_o3.values[:,:-1],dtype=float)
+#    from sklearn.model_selection import StratifiedShuffleSplit  
+#    sss = StratifiedShuffleSplit(test_size=0.2, random_state=23)
+#    for train_index, test_index in sss.split(data_o3, label):
+#        X_train, X_test = data_o3[train_index], data_o3[test_index]
+#        Y_train, Y_test = label[train_index], label[test_index]
+
+
+    df_hist = pd.DataFrame()
+    hist_acc = []
+    hist_prec = []
+    hist_recall = []
+    hist_f1 = []
+    hist_rocp = []
+    y_allcv = np.array([],dtype=int)
+    rocp_allcv = np.array([],dtype=float)
+    
+    sorts=5##看结果是几个类别    
+
+    bst = xgboost_1(label,X_train,Y_train,X_test,Y_test)
+    ada = adaboost_(label,X_train,Y_train,X_test,Y_test,sorts)
+    logic = logic_(label,X_train,Y_train,X_test,Y_test)
+    bag = bag_(label,X_train,Y_train,X_test,Y_test)
+    rf = random_forest(label,X_train,Y_train,X_test,Y_test)
+    sg = sgdclass(label,X_train,Y_train,X_test,Y_test)
+
+##随机选择行数据进行训练
+##    from sklearn.model_selection import StratifiedShuffleSplit  
+##    sss = StratifiedShuffleSplit(test_size=0.2, random_state=23)
+##    for train_index, valid_index in sss.split(rtm, label):
+##        X_train, X_test = rtm[train_index], rtm[valid_index]
+##        Y_train, Y_test = label[train_index], label[valid_index]
+##        
+##    Y_train=np.array(Y_train[:,:],dtype=int)
+##
+##    sss = StratifiedShuffleSplit(test_size=0.1, random_state=23)
+##    for train_index, valid_index in sss.split(X_train, Y_train):
+##        X_train, X_valid = X_train[train_index], X_train[valid_index]
+##        Y_train, Y_valid = Y_train[train_index], Y_train[valid_index]
+#    
+##    bst = xgboost_1(label,X_train,Y_train,X_valid,Y_valid)
+##    ada = adaboost_(label,X_train,Y_train,X_valid,Y_valid)
+##    logic = logic_(label,X_train,Y_train,X_valid,Y_valid)
+##    bag = bag_(label,X_train,Y_train,X_valid,Y_valid)
+##    rf = random_forest(label,X_train,Y_train,X_valid,Y_valid)
+##    sg = sgdclass(label,X_train,Y_train,X_valid,Y_valid)  
+#  
+##    y_pre = ada.predict(X_test)
+##    print("======ada==========")
+##
+##    accuracy = accuracy_score(Y_test,y_pre)
+##    print('Accuracy: %.2f%%' % (accuracy*100.0))
+##    print(classification_report(Y_test, y_pre))
+##    print(confusion_matrix(Y_test, y_pre))
+##    print("ACCURACY:", accuracy_score(Y_test, y_pre))    
+##    print("PRECISION", precision_score(Y_test, y_pre,average='micro'))
+##    print("RECALL:", recall_score(Y_test, y_pre,average='micro'))
+##    print("F1:", f1_score(Y_test, y_pre,average='micro'))
+##    print("ROC_AUC(Pr.):", roc_auc_score(Y_test, y_pre))
+ 
+    
+    
+        
+#    ml = all_function(label,train_x,train_y,test_x,test_y,hist_acc,hist_prec,
+#                      hist_recall,hist_f1,hist_rocp,y_allcv,
+#                      rocp_allcv,ada,logic,bst)
+    
+    
+    #sgdclass(label,train_x,train_y,test_x,test_y)
+    #random_forest(label,train_x,train_y,test_x,test_y)#较低
+    #bag_(label,train_x,train_y,test_x,test_y)
+
+time_end = time.time()
+print('totally cost',time_end-time_start) 
+
+
+
+##对每一个label计算一个roc并绘制图片
+#可以对label=0的时候进行设置：

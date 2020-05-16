@@ -1,3 +1,22 @@
+##检查dataframe的大小
+#df.shape
+##创建一个全是0的dataframe
+#rtma = np.zeros((4500,9088))
+#df1 = pd.DataFrame(rtma)
+
+#设置列名
+#rtm.coulmns = ["uid","sid","tid","rt"]
+#tpm.coulmns = ["uid","sid","tid","tp"]
+
+#rtm1 = np.array(rtm.values[0:30287612,:],dtype=float)#只选有数的部分
+#rtm1 = pd.DataFrame(rtm1,columns=["uid","sid","tid","rt"])
+
+##将一个dataframe的数据逐个处理后装填到空的dataframe
+#for i in range(30287611):
+#    m = int(rtm1.iloc[i,1])
+#    n = int(rtm1.iloc[i,0]*64+rtm1.iloc[i,2])
+#    df1.iloc[m,n] = rtm1.iloc[i,3]
+
 import pandas as pd
 import numpy as np
 
